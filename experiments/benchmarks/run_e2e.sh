@@ -7,3 +7,5 @@ wget https://raw.githubusercontent.com/FranxYao/chain-of-thought-hub/main/gsm8k/
 python experiments/benchmarks/benchmark_e2e.py \
     --attn_type minference \
     --context_window 300000
+# minference 300000 44.320158338546754
+# minference 300000 44.21079638004303

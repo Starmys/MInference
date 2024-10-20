@@ -7,7 +7,7 @@ import torch
 import triton
 import triton.language as tl
 
-from ..cuda import convert_vertical_slash_indexes
+from minference.cuda import convert_vertical_slash_indexes
 
 
 # @triton.autotune(
@@ -172,6 +172,11 @@ def _triton_mixed_sparse_attention(
     return o
 
 
+def profile(fn, tag, warmup=25, rep=100):
+    ms = triton.testing.do_bench(fn, warmup=warmup, rep=rep)
+    print(f'{tag}: {ms:.3f} ms')
+
+
 def vertical_slash_sparse_attention(
     query: torch.Tensor,  # [BATCH, N_HEADS, N_CTX, D_HEAD]
     key: torch.Tensor,    # [BATCH, N_HEADS, N_CTX, D_HEAD]
@@ -197,12 +202,30 @@ def vertical_slash_sparse_attention(
     s_idx = s_idx.to(torch.int32).reshape((batch_size, num_heads, -1)).sort(dim=-1, descending=True)[0]
     seqlens = torch.tensor([context_size], dtype=torch.int32, device=query.device)
     sm_scale = head_dim ** -0.5
+
+    def f():
+        convert_vertical_slash_indexes(
+            seqlens, v_idx, s_idx, context_size, block_size_M, block_size_N,
+        )
+    profile(f, 'convert_index', warmup=250, rep=1000)
+
     block_count, block_offset, column_count, column_index = convert_vertical_slash_indexes(
         seqlens, v_idx, s_idx, context_size, block_size_M, block_size_N,
     )
+
     out = _triton_mixed_sparse_attention(
         query, key, value, seqlens,
         block_count, block_offset, column_count, column_index,
         sm_scale, block_size_M, block_size_N,
     )
     return out[..., :context_size, :head_dim]
+
+
+if __name__ == '__main__':
+    # query, key, value, v_idx, s_idx = torch.load("vs.pt")
+    query = torch.rand((1, 1, 128 * 1024, 128), dtype=torch.float16, device='cuda')
+    key = torch.rand((1, 1, 128 * 1024, 128), dtype=torch.float16, device='cuda')
+    value = torch.rand((1, 1, 128 * 1024, 128), dtype=torch.float16, device='cuda')
+    v_idx = torch.randperm(128 * 1024, dtype=torch.int32, device='cuda')[:1000]
+    s_idx = torch.randperm(128 * 1024, dtype=torch.int32, device='cuda')[:6096]
+    vertical_slash_sparse_attention(query, key, value, v_idx, s_idx)
