@@ -527,8 +527,8 @@ def _prepare_decoder_attention_mask_inference(
             dim=-1,
         )
 
-    if attention_mask is not None and torch.all(attention_mask):
-        return None  # This uses the faster call when training with full samples
+    # if attention_mask is not None and torch.all(attention_mask):
+    #     return None  # This uses the faster call when training with full samples
 
     return attention_mask
 
