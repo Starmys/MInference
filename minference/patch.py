@@ -7,6 +7,7 @@ import torch
 import transformers
 from transformers.cache_utils import *
 from transformers.models.llama.modeling_llama import *
+from transformers.models.llama.modeling_llama import CausalLMOutputWithPast, BaseModelOutputWithPast
 
 from .modules.inf_llm import InfLLMGenerator, inf_llm_forward
 from .modules.minference_forward import (
@@ -802,7 +803,7 @@ def forward_llama_for_causal_lm(
 
     hidden_states = outputs[0]
     if labels is not None:
-        loss_fct = CrossEntropyLoss(reduction="sum")
+        loss_fct = torch.nn.CrossEntropyLoss(reduction="sum")
         valid_seq_len = input_ids.shape[-1] - 1
         valid_seq_len_slide_win = torch.sum(labels[:, 1:] >= 0).item()
         # print("valid_seq_len_slide_win", valid_seq_len)

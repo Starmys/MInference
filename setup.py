@@ -62,7 +62,7 @@ BASE_WHEEL_URL = (
 # FORCE_BUILD: Force a fresh build locally, instead of attempting to find prebuilt wheels
 # SKIP_CUDA_BUILD: Intended to allow CI to use a simple `python setup.py sdist` run to copy over raw files, without any cuda compilation
 FORCE_BUILD = os.getenv("MINFERENCE_FORCE_BUILD", "FALSE") == "TRUE"
-SKIP_CUDA_BUILD = os.getenv("MINFERENCE_SKIP_CUDA_BUILD", "FALSE") == "TRUE"
+SKIP_CUDA_BUILD = os.getenv("MINFERENCE_SKIP_CUDA_BUILD", "TRUE") == "TRUE"
 
 
 def check_if_cuda_home_none(global_option: str) -> None:
