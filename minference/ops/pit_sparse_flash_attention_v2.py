@@ -7,7 +7,7 @@ import torch
 import triton
 import triton.language as tl
 
-from ..cuda import convert_vertical_slash_indexes
+# from ..cuda import convert_vertical_slash_indexes
 
 
 # @triton.autotune(

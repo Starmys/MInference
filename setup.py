@@ -11,7 +11,6 @@ import warnings
 import torch
 from packaging.version import Version, parse
 from setuptools import find_packages, setup
-from torch.utils.cpp_extension import CUDA_HOME, BuildExtension, CUDAExtension
 from wheel.bdist_wheel import bdist_wheel as _bdist_wheel
 
 # PEP0440 compatible formatted version, see:
@@ -62,50 +61,9 @@ BASE_WHEEL_URL = (
 # FORCE_BUILD: Force a fresh build locally, instead of attempting to find prebuilt wheels
 # SKIP_CUDA_BUILD: Intended to allow CI to use a simple `python setup.py sdist` run to copy over raw files, without any cuda compilation
 FORCE_BUILD = os.getenv("MINFERENCE_FORCE_BUILD", "FALSE") == "TRUE"
-SKIP_CUDA_BUILD = os.getenv("MINFERENCE_SKIP_CUDA_BUILD", "TRUE") == "TRUE"
-
-
-def check_if_cuda_home_none(global_option: str) -> None:
-    if CUDA_HOME is not None:
-        return
-    # warn instead of error because user could be downloading prebuilt wheels, so nvcc won't be necessary
-    # in that case.
-    warnings.warn(
-        f"{global_option} was requested, but nvcc was not found.  Are you sure your environment has nvcc available?  "
-        "If you're installing within a container from https://hub.docker.com/r/pytorch/pytorch, "
-        "only images whose names contain 'devel' will provide nvcc."
-    )
 
 
 cmdclass = {}
-ext_modules = []
-
-if not SKIP_CUDA_BUILD:
-    print("\n\ntorch.__version__  = {}\n\n".format(torch.__version__))
-    TORCH_MAJOR = int(torch.__version__.split(".")[0])
-    TORCH_MINOR = int(torch.__version__.split(".")[1])
-
-    # Check, if ATen/CUDAGeneratorImpl.h is found, otherwise use ATen/cuda/CUDAGeneratorImpl.h
-    # See https://github.com/pytorch/pytorch/pull/70650
-    generator_flag = []
-    torch_dir = torch.__path__[0]
-    if os.path.exists(
-        os.path.join(torch_dir, "include", "ATen", "CUDAGeneratorImpl.h")
-    ):
-        generator_flag = ["-DOLD_GENERATOR_PATH"]
-
-    check_if_cuda_home_none("minference")
-
-    ext_modules.append(
-        CUDAExtension(
-            name="minference.cuda",
-            sources=[
-                os.path.join("csrc", "kernels.cpp"),
-                os.path.join("csrc", "vertical_slash_index.cu"),
-            ],
-            extra_compile_args=["-std=c++17", "-O3"],
-        )
-    )
 
 
 def get_minference_version() -> str:
@@ -193,30 +151,6 @@ class CachedWheelsCommand(_bdist_wheel):
             super().run()
 
 
-class NinjaBuildExtension(BuildExtension):
-    def __init__(self, *args, **kwargs) -> None:
-        # do not override env MAX_JOBS if already exists
-        if not os.environ.get("MAX_JOBS"):
-            import psutil
-
-            # calculate the maximum allowed NUM_JOBS based on cores
-            max_num_jobs_cores = max(1, os.cpu_count() // 2)
-
-            # calculate the maximum allowed NUM_JOBS based on free memory
-            free_memory_gb = psutil.virtual_memory().available / (
-                1024**3
-            )  # free memory in GB
-            max_num_jobs_memory = int(
-                free_memory_gb / 9
-            )  # each JOB peak memory cost is ~8-9GB when threads = 4
-
-            # pick lower value of jobs based on cores vs memory metric to minimize oom and swap usage during compilation
-            max_jobs = max(1, min(max_num_jobs_cores, max_num_jobs_memory))
-            os.environ["MAX_JOBS"] = str(max_jobs)
-
-        super().__init__(*args, **kwargs)
-
-
 setup(
     name="minference",
     version=get_minference_version(),
@@ -258,10 +192,5 @@ setup(
     include_package_data=True,
     python_requires=">=3.8.0",
     zip_safe=False,
-    ext_modules=ext_modules,
-    cmdclass={"bdist_wheel": CachedWheelsCommand, "build_ext": NinjaBuildExtension}
-    if ext_modules
-    else {
-        "bdist_wheel": CachedWheelsCommand,
-    },
+    cmdclass={"bdist_wheel": CachedWheelsCommand},
 )
